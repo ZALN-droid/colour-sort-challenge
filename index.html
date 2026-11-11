@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Colour Sort Challenge</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 32px 16px;
+      background: #ffffff;
+      color: #222222;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+
+    h1 {
+      margin: 8px 0;
+      font-size: clamp(24px, 5vw, 32px);
+      font-weight: 600;
+    }
+
+    .instructions {
+      margin: 0 auto 28px;
+      color: #666666;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    .game {
+      width: min(100%, 560px);
+      margin: 0 auto;
+    }
+
+    .tubes {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(48px, 66px));
+      justify-content: center;
+      gap: 34px 22px;
+      padding: 12px 0 28px;
+    }
+
+    .tube-button {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .tube {
+      position: relative;
+      display: block;
+      width: 58px;
+      height: 174px;
+      overflow: hidden;
+      border: 3px solid #444444;
+      border-top: 0;
+      border-radius: 0 0 17px 17px;
+      background: #ffffff;
+      transition: transform 0.16s ease, border-color 0.16s ease;
+    }
+
+    .tube::before {
+      content: "";
+      position: absolute;
+      z-index: 3;
+      top: 0;
+      left: -3px;
+      right: -3px;
+      height: 5px;
+      border-radius: 4px;
+      background: #444444;
+    }
+
+    .tube-button.selected .tube {
+      transform: translateY(-9px);
+      border-color: #c4ab46;
+    }
+
+    .tube-button.selected .tube::before {
+      background: #c4ab46;
+    }
+
+    .liquid {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 25%;
+      border-top: 1px solid rgba(255,255,255,0.38);
+      transition: bottom 0.2s ease;
+    }
+
+    .tube-number {
+      color: #777777;
+      font-size: 12px;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .controls button {
+      min-width: 112px;
+      padding: 11px 20px;
+      border: 1px solid #c4ab46;
+      border-radius: 5px;
+      background: #ffffff;
+      color: #806b20;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .controls button:hover {
+      background: #fbf8ed;
+    }
+
+    #message {
+      min-height: 26px;
+      margin: 22px 0 0;
+      color: #806b20;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    @media (max-width: 390px) {
+      .tubes {
+        column-gap: 12px;
+        row-gap: 28px;
+      }
+      .tube {
+        width: 52px;
+        height: 156px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <h1>Colour Sort Challenge</h1>
+    <p class="instructions">Sort the colours so that each tube contains just one colour.<br>Tap a tube, then tap another to pour.</p>
+
+    <div class="tubes" id="tubes" aria-label="Colour sorting game"></div>
+
+    <div class="controls">
+      <button type="button" id="resetButton">Reset</button>
+    </div>
+
+    <p id="message" aria-live="polite"></p>
+  </main>
+
+  <script>
+    // Each tube is listed from bottom to top.
+    // The same starting layout is used every time the game is reset.
+    const startingTubes = [
+      ["yellow", "blue", "orange", "purple"],
+      ["red", "green", "yellow", "purple"],
+      ["green", "blue", "red", "yellow"],
+      ["green", "red", "yellow", "blue"],
+      ["blue", "green", "orange", "orange"],
+      ["orange", "purple", "red", "purple"],
+      [],
+      []
+    ];
+
+    const colourValues = {
+      red: "#e85d75",
+      yellow: "#f2c14e",
+      blue: "#58a6df",
+      purple: "#9270cf",
+      green: "#63b887",
+      orange: "#ef914d"
+    };
+
+    let tubes = copyTubes(startingTubes);
+    let selectedTube = null;
+    let movesMade = 0;
+    let gameWon = false;
+
+    const tubesElement = document.getElementById("tubes");
+    const messageElement = document.getElementById("message");
+
+    function copyTubes(source) {
+      return source.map(tube => [...tube]);
+    }
+
+    function render() {
+      tubesElement.innerHTML = "";
+
+      tubes.forEach((tube, tubeIndex) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "tube-button";
+        button.setAttribute("aria-label", `Tube ${tubeIndex + 1}`);
+        button.setAttribute("aria-pressed", selectedTube === tubeIndex ? "true" : "false");
+        button.disabled = gameWon;
+
+        if (selectedTube === tubeIndex) {
+          button.classList.add("selected");
+        }
+
+        const tubeVisual = document.createElement("span");
+        tubeVisual.className = "tube";
+
+        tube.forEach((colour, layerIndex) => {
+          const layer = document.createElement("span");
+          layer.className = "liquid";
+          layer.style.backgroundColor = colourValues[colour];
+          layer.style.bottom = `${layerIndex * 25}%`;
+          tubeVisual.appendChild(layer);
+        });
+
+        const number = document.createElement("span");
+        number.className = "tube-number";
+        number.textContent = tubeIndex + 1;
+
+        button.appendChild(tubeVisual);
+        button.appendChild(number);
+        button.addEventListener("click", () => handleTubeClick(tubeIndex));
+        tubesElement.appendChild(button);
+      });
+    }
+
+    function handleTubeClick(index) {
+      if (gameWon) return;
+
+      messageElement.textContent = "";
+
+      if (selectedTube === null) {
+        if (tubes[index].length > 0) {
+          selectedTube = index;
+        }
+        render();
+        return;
+      }
+
+      if (selectedTube === index) {
+        selectedTube = null;
+        render();
+        return;
+      }
+
+      const source = tubes[selectedTube];
+      const destination = tubes[index];
+
+      const sourceColour = source[source.length - 1];
+      const destinationColour = destination[destination.length - 1];
+
+      const canPour =
+        source.length > 0 &&
+        destination.length < 4 &&
+        (destination.length === 0 || destinationColour === sourceColour);
+
+      if (!canPour) {
+        selectedTube = destination.length > 0 ? index : null;
+        messageElement.textContent = "That pour isn't possible.";
+        render();
+        return;
+      }
+
+      // Pour the top run of matching colour, up to the available space.
+      let amountToPour = 0;
+      for (let i = source.length - 1; i >= 0; i--) {
+        if (source[i] !== sourceColour) break;
+        amountToPour++;
+      }
+
+      amountToPour = Math.min(amountToPour, 4 - destination.length);
+
+      for (let i = 0; i < amountToPour; i++) {
+        destination.push(source.pop());
+      }
+
+      movesMade++;
+      selectedTube = null;
+      render();
+
+      if (hasWon()) {
+        gameWon = true;
+        selectedTube = null;
+        document.getElementById("resetButton").hidden = true;
+        messageElement.textContent = `Puzzle completed in ${movesMade} moves!`;
+        render();
+      }
+    }
+
+    function hasWon() {
+      return tubes.every(tube =>
+        tube.length === 0 ||
+        (tube.length === 4 && tube.every(colour => colour === tube[0]))
+      );
+    }
+
+    function resetGame() {
+      tubes = copyTubes(startingTubes);
+      selectedTube = null;
+      movesMade = 0;
+      gameWon = false;
+      document.getElementById("resetButton").hidden = false;
+      messageElement.textContent = "";
+      render();
+    }
+
+    document.getElementById("resetButton").addEventListener("click", resetGame);
+
+    render();
+  </script>
+</body>
+</html>
